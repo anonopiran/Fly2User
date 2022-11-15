@@ -92,7 +92,7 @@ func UserDelFile(email string) error {
 	f_path := user_fpath(email)
 	log_w_data := log.WithField("email", email)
 	err := os.Remove(f_path)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		log_w_data.Error(err)
 		return err
 	}
