@@ -19,8 +19,9 @@ func AddAllUsers() (int, error) {
 		log.WithError(err).Error("can not read user files")
 		return 0, err
 	}
-	conn, err := u2g.GrpcClient(cfg.V2flyApiAddress)
+	conn, err := u2g.NewGrpcConn(cfg.V2flyApiAddress)
 	if err != nil {
+		log.WithError(err).Error("error while dialing grpc server")
 		return 0, err
 	}
 	defer conn.Close()
@@ -28,20 +29,21 @@ func AddAllUsers() (int, error) {
 	for _, f_ := range files {
 		email := f_.Name()
 		email = email[:len(email)-len(".user")]
-		log_w_data := log.WithField("email", email)
+		log_w_udata := log.WithField("email", email)
 		// ....
 		if err != nil {
-			log_w_data.WithError(err).Error("can not parse json file")
+			log_w_udata.WithError(err).Error("can not parse json file")
 			continue
 		}
 		f_data, err := UserFromFile(email)
 		if err != nil {
 			continue
 		}
-		add_err := u2g.AddUser(conn, cfg.InboundList, &f_data, false)
+		add_err := f_data.AddMultiple(conn, &cfg.InboundList, false)
 		if len(add_err) > 0 {
-			log_w_data.WithError(err)
-			continue
+			for _, e_ := range add_err {
+				log_w_udata.WithField("inbound", e_.GetInbound()).WithError(e_)
+			}
 		}
 		cnt_total += 1
 	}
@@ -51,7 +53,7 @@ func AddAllUsers() (int, error) {
 func Supervise() {
 	sleeper := time.NewTicker(time.Second * time.Duration(cfg.SuperviseInterval))
 	for {
-		if check_server_restart() {
+		if CheckServerRestart() {
 			log.Warning("found server restart. adding users")
 			AddAllUsers()
 		} else {
@@ -91,23 +93,19 @@ func UserToFile(user u2g.UserAddType) error {
 func UserDelFile(email string) error {
 	f_path := user_fpath(email)
 	log_w_data := log.WithField("email", email)
-	err := os.Remove(f_path)
-	if err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(f_path); err != nil && !os.IsNotExist(err) {
 		log_w_data.Error(err)
 		return err
 	}
 	return nil
 }
-func UserCheckFie(email string) bool {
+func UserCheckFile(email string) bool {
 	f_path := user_fpath(email)
 	_, err := os.Stat(f_path)
 	return err == nil
 }
-func user_fpath(email string) string {
-	return filepath.Join(string(cfg.UserDir), email+".user")
-}
-func check_server_restart() bool {
-	conn, err := u2g.GrpcClient(cfg.V2flyApiAddress)
+func CheckServerRestart() bool {
+	conn, err := u2g.NewGrpcConn(cfg.V2flyApiAddress)
 	if err != nil {
 		log.WithError(err).Error("error while watching server restart")
 		return false
@@ -118,6 +116,9 @@ func check_server_restart() bool {
 		Email: cfg.SuperviseUuid + "@supervis.or",
 		Level: 0,
 	}
-	err_list := u2g.AddUser(conn, cfg.InboundList[:1], &_u, true)
-	return !(len(err_list) > 0 && u2g.AddUserErrIsExists(err_list[0]))
+	err = _u.Add(conn, &cfg.InboundList[0], true)
+	return err == nil || !err.IsUserExistsError()
+}
+func user_fpath(email string) string {
+	return filepath.Join(string(cfg.UserDir), email+".user")
 }

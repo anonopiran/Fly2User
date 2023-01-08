@@ -5,8 +5,6 @@ import (
 	supervisor "Fly2User/Supervisor"
 )
 
-// var cfg = config.Config()
-
 func main() {
 	go supervisor.Supervise()
 	api.Serve()

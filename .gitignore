@@ -21,3 +21,7 @@ __debug_bin
 .vscode/launch.json
 storage/
 docker-compose.yaml
+
+test-api.sh
+
+test-download.sh

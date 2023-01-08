@@ -2,6 +2,7 @@ package user2grpc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -21,10 +22,14 @@ import (
 // ==================================
 // types
 // ==================================
-type PROTO int
+type ProtocolType int
+type GrpcErrorType struct {
+	Err     error
+	Inbound InboundType
+}
 
 const (
-	VMESS_PROTO PROTO = iota
+	VMESS_PROTO ProtocolType = iota
 	VLESS_PROTO
 	TROJAN_PROTO
 	NULL_PROTO
@@ -32,7 +37,7 @@ const (
 
 type InboundType struct {
 	Tag   string
-	Proto PROTO
+	Proto ProtocolType
 }
 
 type UserAddType struct {
@@ -43,20 +48,32 @@ type UserAddType struct {
 type UserRemoveType struct {
 	Email string
 }
-
-// ==================================
-// functions
-// ==================================
-func GrpcClient(server string) (*grpc.ClientConn, error) {
-	opt := grpc.WithTransportCredentials(insecure.NewCredentials())
-	conn, err := grpc.Dial(server, opt)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+type GrpcError interface {
+	IsUserExistsError() bool
+	IsUserNotFoundError() bool
+	GetInbound() InboundType
+	Error() string
 }
 
-func _add_user(conn *grpc.ClientConn, inb *InboundType, user *UserAddType, exists_err bool) error {
+func (f *InboundType) SetValue(s string) error {
+	x_ := strings.Split(s, ":")
+	tag := x_[0]
+	proto_s := x_[1]
+	var proto ProtocolType
+	switch strings.ToUpper(proto_s) {
+	case "VMESS":
+		proto = VMESS_PROTO
+	case "VLESS":
+		proto = VLESS_PROTO
+	case "TROJAN":
+		proto = TROJAN_PROTO
+	default:
+		return fmt.Errorf("proto %s not found", s)
+	}
+	*f = InboundType{Tag: tag, Proto: proto}
+	return nil
+}
+func (user *UserAddType) Add(conn *grpc.ClientConn, inb *InboundType, exists_err bool) GrpcError {
 	var account *any.Any
 	var err error
 	var acc protoiface.MessageV1
@@ -73,7 +90,7 @@ func _add_user(conn *grpc.ClientConn, inb *InboundType, user *UserAddType, exist
 
 	user_ob := protocol.User{Account: account, Email: user.Email, Level: user.Level}
 	add_user_op := proxy.AddUserOperation{User: &user_ob}
-	req := inbound_alter_request(inb.Tag, serial.ToTypedMessage(&add_user_op))
+	req := NewInboundAlterRequest(inb.Tag, serial.ToTypedMessage(&add_user_op))
 	// .....
 	client := proxy.NewHandlerServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -81,52 +98,75 @@ func _add_user(conn *grpc.ClientConn, inb *InboundType, user *UserAddType, exist
 	_, err = client.AlterInbound(ctx, &req)
 
 	if err != nil {
-		if !AddUserErrIsExists(err) || exists_err {
+		err := &GrpcErrorType{Err: err, Inbound: *inb}
+		if !err.IsUserExistsError() || exists_err {
 			return err
 		}
 	}
 	return nil
 }
 
-func _remove_user(conn *grpc.ClientConn, inb InboundType, user *UserRemoveType) error {
+func (user *UserRemoveType) Remove(conn *grpc.ClientConn, inb *InboundType, notfound_err bool) GrpcError {
 	rm_user_op := proxy.RemoveUserOperation{Email: user.Email}
-	req := inbound_alter_request(inb.Tag, serial.ToTypedMessage(&rm_user_op))
+	req := NewInboundAlterRequest(inb.Tag, serial.ToTypedMessage(&rm_user_op))
 	// .....
 	client := proxy.NewHandlerServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_, err := client.AlterInbound(ctx, &req)
 	if err != nil {
-		if strings.HasSuffix(err.Error(), "not found.") {
-		} else {
+		err := &GrpcErrorType{Err: err, Inbound: *inb}
+		if !err.IsUserNotFoundError() || notfound_err {
 			return err
 		}
 	}
 	return nil
 }
-func AddUser(conn *grpc.ClientConn, inbs []InboundType, user *UserAddType, exists_err bool) []error {
-	err := []error{}
-	for _, inb := range inbs {
-		e := _add_user(conn, &inb, user, exists_err)
+func (user *UserAddType) AddMultiple(conn *grpc.ClientConn, inbs *[]InboundType, exists_err bool) []GrpcError {
+	err := []GrpcError{}
+	for _, inb := range *inbs {
+		e := user.Add(conn, &inb, exists_err)
 		if e != nil {
 			err = append(err, e)
 		}
 	}
 	return err
 }
-func RemoveUser(conn *grpc.ClientConn, inbs []InboundType, user *UserRemoveType) []error {
-	err := []error{}
-	for _, inb := range inbs {
-		e := _remove_user(conn, inb, user)
+func (user *UserRemoveType) RemoveMultiple(conn *grpc.ClientConn, inbs *[]InboundType, notfound_err bool) []GrpcError {
+	err := []GrpcError{}
+	for _, inb := range *inbs {
+		e := user.Remove(conn, &inb, notfound_err)
 		if e != nil {
 			err = append(err, e)
 		}
 	}
 	return err
 }
-func inbound_alter_request(tag string, op *anypb.Any) proxy.AlterInboundRequest {
+func (err *GrpcErrorType) IsUserExistsError() bool {
+	return strings.HasSuffix(err.Err.Error(), "already exists.")
+}
+
+func (err *GrpcErrorType) IsUserNotFoundError() bool {
+	return strings.HasSuffix(err.Err.Error(), "not found.")
+}
+func (err *GrpcErrorType) GetInbound() InboundType {
+	return err.Inbound
+}
+func (err *GrpcErrorType) Error() string {
+	return err.Err.Error()
+}
+
+// ==================================
+// functions
+// ==================================
+func NewGrpcConn(server string) (*grpc.ClientConn, GrpcError) {
+	opt := grpc.WithTransportCredentials(insecure.NewCredentials())
+	conn, err := grpc.Dial(server, opt)
+	if err != nil {
+		return nil, &GrpcErrorType{Err: err}
+	}
+	return conn, nil
+}
+func NewInboundAlterRequest(tag string, op *anypb.Any) proxy.AlterInboundRequest {
 	return proxy.AlterInboundRequest{Tag: tag, Operation: op}
-}
-func AddUserErrIsExists(err error) bool {
-	return strings.HasSuffix(err.Error(), "already exists.")
 }

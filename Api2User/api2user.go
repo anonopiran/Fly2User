@@ -25,7 +25,7 @@ func add_user() gin.HandlerFunc {
 			return
 		}
 		email := uar.Email
-		if supervisor.UserCheckFie(email) {
+		if supervisor.UserCheckFile(email) {
 			existing, err := supervisor.UserFromFile(email)
 			if err != nil {
 				c.AbortWithError(http.StatusInternalServerError, err)
@@ -52,7 +52,7 @@ func add_user() gin.HandlerFunc {
 			return
 		}
 		// ........
-		conn, err := u2g.GrpcClient(cfg.V2flyApiAddress)
+		conn, err := u2g.NewGrpcConn(cfg.V2flyApiAddress)
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			supervisor.UserDelFile(email)
@@ -60,13 +60,15 @@ func add_user() gin.HandlerFunc {
 		}
 		defer conn.Close()
 
-		err_list := u2g.AddUser(conn, cfg.InboundList, &uar, false)
+		// err_list := u2g.AddUser(conn, cfg.InboundList, &uar, false)
+		err_list := uar.AddMultiple(conn, &cfg.InboundList, false)
 		errs_res := []string{}
 		for _, err = range err_list {
 			errs_res = append(errs_res, err.Error())
 		}
 		if len(err_list) > 0 {
-			u2g.RemoveUser(conn, cfg.InboundList, &u2g.UserRemoveType{Email: email})
+			urr := u2g.UserRemoveType{Email: email}
+			urr.RemoveMultiple(conn, &cfg.InboundList, false)
 			supervisor.UserDelFile(email)
 			c.AbortWithStatusJSON(http.StatusBadRequest, map[string][]string{"msg": errs_res})
 			return
@@ -83,13 +85,13 @@ func remove_user() gin.HandlerFunc {
 		}
 		email := urr.Email
 		// ........
-		conn, err := u2g.GrpcClient(cfg.V2flyApiAddress)
+		conn, err := u2g.NewGrpcConn(cfg.V2flyApiAddress)
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
 		defer conn.Close()
-		err_list := u2g.RemoveUser(conn, cfg.InboundList, &urr)
+		err_list := urr.RemoveMultiple(conn, &cfg.InboundList, false)
 		errs_res := []string{}
 		for _, err = range err_list {
 			errs_res = append(errs_res, err.Error())
@@ -98,7 +100,7 @@ func remove_user() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, map[string][]string{"msg": errs_res})
 			return
 		}
-		if err = supervisor.UserDelFile(email); err != nil {
+		if err := supervisor.UserDelFile(email); err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
