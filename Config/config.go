@@ -16,7 +16,7 @@ type PathType string
 type LogLevelType string
 type settingsType struct {
 	LogLevel          LogLevelType      `env:"LOG_LEVEL" env-default:"warning"`
-	V2flyApiAddress   string            `env:"V2FLY_API_ADDRESS" env-required:"true"`
+	V2flyApiAddress   []string          `env:"V2FLY_API_ADDRESS" env-required:"true"`
 	SuperviseInterval int               `env:"SUPERVISE_INTERVAL" env-default:"5"`
 	SuperviseUuid     string            `env:"SUPERVISE_UUID" env-required:"true"`
 	UserDir           PathType          `env:"USER_DIR" env-default:"./storage/users"`

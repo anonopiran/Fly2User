@@ -14,7 +14,6 @@ import (
 	"github.com/v2fly/v2ray-core/v5/proxy/vless"
 	"github.com/v2fly/v2ray-core/v5/proxy/vmess"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/runtime/protoiface"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -73,7 +72,7 @@ func (f *InboundType) SetValue(s string) error {
 	*f = InboundType{Tag: tag, Proto: proto}
 	return nil
 }
-func (user *UserAddType) Add(conn *grpc.ClientConn, inb *InboundType, exists_err bool) GrpcError {
+func (user *UserAddType) Add(conn *grpc.ClientConn, inb *InboundType, existsErr bool) GrpcError {
 	var account *any.Any
 	var err error
 	var acc protoiface.MessageV1
@@ -99,14 +98,14 @@ func (user *UserAddType) Add(conn *grpc.ClientConn, inb *InboundType, exists_err
 
 	if err != nil {
 		err := &GrpcErrorType{Err: err, Inbound: *inb}
-		if !err.IsUserExistsError() || exists_err {
+		if !err.IsUserExistsError() || existsErr {
 			return err
 		}
 	}
 	return nil
 }
 
-func (user *UserRemoveType) Remove(conn *grpc.ClientConn, inb *InboundType, notfound_err bool) GrpcError {
+func (user *UserRemoveType) Remove(conn *grpc.ClientConn, inb *InboundType, notFoundErr bool) GrpcError {
 	rm_user_op := proxy.RemoveUserOperation{Email: user.Email}
 	req := NewInboundAlterRequest(inb.Tag, serial.ToTypedMessage(&rm_user_op))
 	// .....
@@ -116,26 +115,26 @@ func (user *UserRemoveType) Remove(conn *grpc.ClientConn, inb *InboundType, notf
 	_, err := client.AlterInbound(ctx, &req)
 	if err != nil {
 		err := &GrpcErrorType{Err: err, Inbound: *inb}
-		if !err.IsUserNotFoundError() || notfound_err {
+		if !err.IsUserNotFoundError() || notFoundErr {
 			return err
 		}
 	}
 	return nil
 }
-func (user *UserAddType) AddMultiple(conn *grpc.ClientConn, inbs *[]InboundType, exists_err bool) []GrpcError {
+func (user *UserAddType) AddMultiple(conn *grpc.ClientConn, inbs *[]InboundType, existsErr bool) []GrpcError {
 	err := []GrpcError{}
 	for _, inb := range *inbs {
-		e := user.Add(conn, &inb, exists_err)
+		e := user.Add(conn, &inb, existsErr)
 		if e != nil {
 			err = append(err, e)
 		}
 	}
 	return err
 }
-func (user *UserRemoveType) RemoveMultiple(conn *grpc.ClientConn, inbs *[]InboundType, notfound_err bool) []GrpcError {
+func (user *UserRemoveType) RemoveMultiple(conn *grpc.ClientConn, inbs *[]InboundType, notFoundErr bool) []GrpcError {
 	err := []GrpcError{}
 	for _, inb := range *inbs {
-		e := user.Remove(conn, &inb, notfound_err)
+		e := user.Remove(conn, &inb, notFoundErr)
 		if e != nil {
 			err = append(err, e)
 		}
@@ -159,14 +158,6 @@ func (err *GrpcErrorType) Error() string {
 // ==================================
 // functions
 // ==================================
-func NewGrpcConn(server string) (*grpc.ClientConn, GrpcError) {
-	opt := grpc.WithTransportCredentials(insecure.NewCredentials())
-	conn, err := grpc.Dial(server, opt)
-	if err != nil {
-		return nil, &GrpcErrorType{Err: err}
-	}
-	return conn, nil
-}
 func NewInboundAlterRequest(tag string, op *anypb.Any) proxy.AlterInboundRequest {
 	return proxy.AlterInboundRequest{Tag: tag, Operation: op}
 }
