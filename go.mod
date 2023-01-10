@@ -40,6 +40,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
+	github.com/google/uuid v1.3.0
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/v2fly/v2ray-core/v5 v5.1.0
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
