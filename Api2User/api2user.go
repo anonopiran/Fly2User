@@ -143,7 +143,7 @@ func Serve() {
 		api_user.POST("/", addUserHandler())
 		api_user.DELETE("/", removeUserHandler())
 	}
-	log.Fatal(app.Run(":3000"))
+	log.Fatal(app.Run(config.Config.Listen))
 }
 func init() {
 	servers = config.Config.V2flyApiAddress

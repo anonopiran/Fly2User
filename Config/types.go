@@ -22,6 +22,7 @@ type SettingsType struct {
 	UserDir           PathType          `env:"USER_DIR" env-default:"./storage/users"`
 	InboundList       []u2u.InboundType `env:"INBOUND_LIST" env-required:"true"`
 	LogLevel          LogLevelType      `env:"LOG_LEVEL" env-default:"warning"`
+	Listen            string            `env:"LISTEN" env-default:":3000"`
 }
 
 func (f *PathType) AsString() string {
