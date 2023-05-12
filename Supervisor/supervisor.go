@@ -12,11 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// var servers []config.V2rayUrlType
-// var inbounds []u2u.InboundType
-// var userDir config.PathType
-// var supervisUUID string
-
 // ==================================
 // functions
 // ==================================

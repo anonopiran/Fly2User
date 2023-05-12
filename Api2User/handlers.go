@@ -14,12 +14,9 @@ import (
 	"google.golang.org/grpc"
 )
 
-var servers []config.V2rayUrlType
-var inbounds []u2u.InboundType
-
 func manUser(fn func(*grpc.ClientConn, *[]u2u.InboundType, bool) []u2u.GrpcError, exitOnErr bool) bool {
 	hasErr := false
-	for _, trg := range servers {
+	for _, trg := range cfg().V2flyApiAddress {
 		logWithTarget := logrus.WithField("target", trg)
 		res, err := u2u.ResolveV2FlyServer(trg.AsUrl())
 		if err != nil {
@@ -38,7 +35,8 @@ func manUser(fn func(*grpc.ClientConn, *[]u2u.InboundType, bool) []u2u.GrpcError
 				continue
 			}
 			defer conn.Close()
-			errList := fn(conn, &inbounds, false)
+			iList := cfg().InboundList
+			errList := fn(conn, &iList, false)
 			if len(errList) > 0 {
 				for _, err := range errList {
 					logWithServerData.WithError(err).Error("error happened while add/remove user")
@@ -155,4 +153,7 @@ func countUserHandler() gin.HandlerFunc {
 		}
 		c.AbortWithStatusJSON(http.StatusOK, len(usrs))
 	}
+}
+func cfg() config.SettingsType {
+	return *config.Config()
 }
