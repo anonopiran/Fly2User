@@ -3,8 +3,10 @@ package config
 import (
 	u2u "Fly2User/User2Upstream"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -14,6 +16,10 @@ type PathType string
 type LogLevelType string
 type V2rayUrlType string
 type UUIDType string
+type AuthType struct {
+	Username string
+	Password string
+}
 type SettingsType struct {
 	V2flyApiAddress   []V2rayUrlType    `env:"V2FLY_API_ADDRESS,required"`
 	SuperviseInterval int               `env:"SUPERVISE_INTERVAL" envDefault:"5"`
@@ -22,6 +28,7 @@ type SettingsType struct {
 	InboundList       []u2u.InboundType `env:"INBOUND_LIST,required"`
 	LogLevel          LogLevelType      `env:"LOG_LEVEL" envDefault:"warning"`
 	Listen            string            `env:"LISTEN" envDefault:":3000"`
+	Auth              []AuthType        `env:"AUTH" envDefault:""`
 }
 
 func (f *PathType) AsString() string {
@@ -39,10 +46,8 @@ func (f *UUIDType) AsString() string {
 // .....
 func (f *PathType) UnmarshalText(text []byte) error {
 	s := string(text)
-	LogWithRaw := log.WithField("value", string(s))
 	err := os.MkdirAll(s, os.ModePerm)
 	if err != nil {
-		LogWithRaw.Error(err)
 		return err
 	}
 	*f = PathType(s)
@@ -50,20 +55,16 @@ func (f *PathType) UnmarshalText(text []byte) error {
 }
 func (f *V2rayUrlType) UnmarshalText(text []byte) error {
 	s := string(text)
-	LogWithRaw := log.WithField("value", s)
 	u, err := url.Parse(s)
 	if err != nil {
-		LogWithRaw.Error(err)
 		return err
 	}
 	if u.Hostname() == "" {
 		e := errors.New("hostname not provided")
-		LogWithRaw.Error(e)
 		return e
 	}
 	if u.Port() == "" {
 		e := errors.New("port not provided")
-		LogWithRaw.Error(e)
 		return e
 	}
 	*f = V2rayUrlType(s)
@@ -71,10 +72,8 @@ func (f *V2rayUrlType) UnmarshalText(text []byte) error {
 }
 func (f *UUIDType) UnmarshalText(text []byte) error {
 	s := string(text)
-	LogWithRaw := log.WithField("value", s)
 	_, err := uuid.Parse(s)
 	if err != nil {
-		LogWithRaw.Error(err)
 		return err
 	}
 	*f = UUIDType(s)
@@ -82,13 +81,23 @@ func (f *UUIDType) UnmarshalText(text []byte) error {
 }
 func (f *LogLevelType) UnmarshalText(text []byte) error {
 	s := string(text)
-	LogWithRaw := log.WithField("value", s)
 	ll, err := log.ParseLevel(s)
 	if err != nil {
-		LogWithRaw.Error(err)
 		return err
 	}
 	log.SetLevel(ll)
 	*f = LogLevelType(s)
+	return nil
+}
+func (f *AuthType) UnmarshalText(text []byte) error {
+	s := string(text)
+	splt := strings.SplitN(s, ":", 2)
+	if len(splt) < 2 {
+		return fmt.Errorf("not user/pass detected in %s", s)
+	}
+	*f = AuthType{
+		Username: splt[0],
+		Password: splt[1],
+	}
 	return nil
 }
