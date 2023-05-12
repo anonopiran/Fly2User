@@ -4,7 +4,6 @@ import (
 	config "Fly2User/Config"
 	supervisor "Fly2User/Supervisor"
 	"errors"
-	"fmt"
 	"net/http"
 
 	u2u "Fly2User/User2Upstream"
@@ -154,6 +153,6 @@ func countUserHandler() gin.HandlerFunc {
 			c.AbortWithError(http.StatusInternalServerError, errors.New("an unknown error happened while calling upstream server"))
 			return
 		}
-		c.AbortWithStatusJSON(http.StatusOK, fmt.Sprint(len(usrs)))
+		c.AbortWithStatusJSON(http.StatusOK, len(usrs))
 	}
 }
