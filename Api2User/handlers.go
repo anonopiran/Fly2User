@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/hashstructure/v2"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -21,14 +21,14 @@ var inbounds []u2u.InboundType
 func manUser(fn func(*grpc.ClientConn, *[]u2u.InboundType, bool) []u2u.GrpcError, exitOnErr bool) bool {
 	hasErr := false
 	for _, trg := range servers {
-		logWithTarget := log.WithField("target", trg)
+		logWithTarget := logrus.WithField("target", trg)
 		res, err := u2u.ResolveV2FlyServer(trg.AsUrl())
 		if err != nil {
 			logWithTarget.WithError(err).Error("error while resolving v2fly server")
 			continue
 		}
 		for _, srv := range res {
-			logWithServerData := log.WithField("server", srv)
+			logWithServerData := logrus.WithField("server", srv)
 			conn, err := srv.DialGrpc()
 			if err != nil {
 				hasErr = true
@@ -61,8 +61,10 @@ func rmUser(user *u2u.UserRemoveType, exitOnErr bool) bool {
 }
 func addUserHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		logWithField := logrus.WithField("handler", "removeUserHandler")
 		uar := u2u.UserAddType{}
 		if err := c.BindJSON(&uar); err != nil {
+			logWithField.WithError(err).Error()
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
@@ -70,16 +72,19 @@ func addUserHandler() gin.HandlerFunc {
 		if supervisor.UserCheckFile(email) {
 			existing, err := supervisor.UserFromFile(email)
 			if err != nil {
+				logWithField.WithError(err).Error()
 				c.AbortWithError(http.StatusInternalServerError, err)
 				return
 			}
 			req_hash, err := hashstructure.Hash(uar, hashstructure.FormatV2, nil)
 			if err != nil {
+				logWithField.WithError(err).Error()
 				c.AbortWithError(http.StatusInternalServerError, err)
 				return
 			}
 			existing_hash, err := hashstructure.Hash(existing, hashstructure.FormatV2, nil)
 			if err != nil {
+				logWithField.WithError(err).Error()
 				c.AbortWithError(http.StatusInternalServerError, err)
 				return
 			}
@@ -109,8 +114,10 @@ func addUserHandler() gin.HandlerFunc {
 }
 func removeUserHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		logWithField := logrus.WithField("handler", "removeUserHandler")
 		urr := u2u.UserRemoveType{}
 		if err := c.BindJSON(&urr); err != nil {
+			logWithField.WithError(err).Error()
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
@@ -131,6 +138,7 @@ func removeUserHandler() gin.HandlerFunc {
 			if urrErr == nil {
 				addUser(&uar, false)
 			}
+			logWithField.WithError(err).Error()
 			c.AbortWithError(http.StatusInternalServerError, err)
 			return
 		}
@@ -139,8 +147,10 @@ func removeUserHandler() gin.HandlerFunc {
 }
 func countUserHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		logWithField := logrus.WithField("handler", "countUserHandler")
 		usrs, err := supervisor.ReadAllUsers()
 		if err != nil {
+			logWithField.WithError(err).Error()
 			c.AbortWithError(http.StatusInternalServerError, errors.New("an unknown error happened while calling upstream server"))
 			return
 		}

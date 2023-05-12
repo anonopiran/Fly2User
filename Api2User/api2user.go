@@ -8,6 +8,7 @@ import (
 )
 
 func Serve() {
+	cfg := config.Config()
 	app := gin.Default()
 	api_user := app.Group("/user")
 	{
@@ -15,9 +16,5 @@ func Serve() {
 		api_user.DELETE("/", removeUserHandler())
 		api_user.GET("/count", countUserHandler())
 	}
-	log.Fatal(app.Run(config.Config.Listen))
-}
-func init() {
-	servers = config.Config.V2flyApiAddress
-	inbounds = config.Config.InboundList
+	log.Fatal(app.Run(cfg.Listen))
 }

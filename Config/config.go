@@ -1,35 +1,35 @@
 package config
 
 import (
-	"fmt"
 	"os"
+	"sync"
 
-	"github.com/ilyakaznacheev/cleanenv"
-	log "github.com/sirupsen/logrus"
+	"github.com/caarlos0/env/v8"
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
 
-var Config SettingsType
+var lock = &sync.Mutex{}
+var settingsInstance *SettingsType
 
-func Describe() {
-	var cfg SettingsType
-	help, err := cleanenv.GetDescription(&cfg, nil)
-	if err != nil {
-		log.WithError(err).Panic("can not generate description")
-	}
-	log.Println(help)
-}
+func Config() *SettingsType {
+	lock.Lock()
+	defer lock.Unlock()
+	if settingsInstance == nil {
+		settingsInstance = &SettingsType{}
 
-func init() {
-	var err error = nil
-	if _, err_file := os.Stat(".env"); err_file == nil {
-		err = cleanenv.ReadConfig(".env", &Config)
-		log.Info("found .env file")
-	} else {
-		err = cleanenv.ReadEnv(&Config)
-		log.Info("no .env file found")
+		if _, error := os.Stat(".env"); !os.IsNotExist(error) {
+			logrus.Warning("found .env file")
+			if err := godotenv.Load(); err != nil {
+				logrus.Panicf("%+v", err)
+			}
+		} else {
+			logrus.Warn("no .env file found")
+		}
+		if err := env.Parse(settingsInstance); err != nil {
+			logrus.Panicf("%+v", err)
+		}
+		logrus.Warnf("config: %+v", *settingsInstance)
 	}
-	if err != nil {
-		log.WithError(err).Panic("can not initiate configuration")
-	}
-	log.WithField("data", fmt.Sprintf("%+v", Config)).Debug("Parsed Configuration")
+	return settingsInstance
 }

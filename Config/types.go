@@ -14,15 +14,14 @@ type PathType string
 type LogLevelType string
 type V2rayUrlType string
 type UUIDType string
-
 type SettingsType struct {
-	V2flyApiAddress   []V2rayUrlType    `env:"V2FLY_API_ADDRESS" env-required:"true"`
-	SuperviseInterval int               `env:"SUPERVISE_INTERVAL" env-default:"5"`
-	SuperviseUuid     UUIDType          `env:"SUPERVISE_UUID" env-required:"true"`
-	UserDir           PathType          `env:"USER_DIR" env-default:"./storage/users"`
-	InboundList       []u2u.InboundType `env:"INBOUND_LIST" env-required:"true"`
-	LogLevel          LogLevelType      `env:"LOG_LEVEL" env-default:"warning"`
-	Listen            string            `env:"LISTEN" env-default:":3000"`
+	V2flyApiAddress   []V2rayUrlType    `env:"V2FLY_API_ADDRESS,required"`
+	SuperviseInterval int               `env:"SUPERVISE_INTERVAL" envDefault:"5"`
+	SuperviseUuid     UUIDType          `env:"SUPERVISE_UUID,required"`
+	UserDir           PathType          `env:"USER_DIR" envDefault:"./storage/users"`
+	InboundList       []u2u.InboundType `env:"INBOUND_LIST,required"`
+	LogLevel          LogLevelType      `env:"LOG_LEVEL" envDefault:"warning"`
+	Listen            string            `env:"LISTEN" envDefault:":3000"`
 }
 
 func (f *PathType) AsString() string {
@@ -38,8 +37,9 @@ func (f *UUIDType) AsString() string {
 }
 
 // .....
-func (f *PathType) SetValue(s string) error {
-	LogWithRaw := log.WithField("value", s)
+func (f *PathType) UnmarshalText(text []byte) error {
+	s := string(text)
+	LogWithRaw := log.WithField("value", string(s))
 	err := os.MkdirAll(s, os.ModePerm)
 	if err != nil {
 		LogWithRaw.Error(err)
@@ -48,7 +48,8 @@ func (f *PathType) SetValue(s string) error {
 	*f = PathType(s)
 	return nil
 }
-func (f *V2rayUrlType) SetValue(s string) error {
+func (f *V2rayUrlType) UnmarshalText(text []byte) error {
+	s := string(text)
 	LogWithRaw := log.WithField("value", s)
 	u, err := url.Parse(s)
 	if err != nil {
@@ -68,7 +69,8 @@ func (f *V2rayUrlType) SetValue(s string) error {
 	*f = V2rayUrlType(s)
 	return nil
 }
-func (f *UUIDType) SetValue(s string) error {
+func (f *UUIDType) UnmarshalText(text []byte) error {
+	s := string(text)
 	LogWithRaw := log.WithField("value", s)
 	_, err := uuid.Parse(s)
 	if err != nil {
@@ -78,7 +80,8 @@ func (f *UUIDType) SetValue(s string) error {
 	*f = UUIDType(s)
 	return nil
 }
-func (f *LogLevelType) SetValue(s string) error {
+func (f *LogLevelType) UnmarshalText(text []byte) error {
+	s := string(text)
 	LogWithRaw := log.WithField("value", s)
 	ll, err := log.ParseLevel(s)
 	if err != nil {

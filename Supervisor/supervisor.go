@@ -12,18 +12,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var servers []config.V2rayUrlType
-var inbounds []u2u.InboundType
-var userDir config.PathType
-var supervisUUID string
+// var servers []config.V2rayUrlType
+// var inbounds []u2u.InboundType
+// var userDir config.PathType
+// var supervisUUID string
 
 // ==================================
 // functions
 // ==================================
 func Supervise() {
-	sleeper := time.NewTicker(time.Second * time.Duration(config.Config.SuperviseInterval))
+	sleeper := time.NewTicker(time.Second * time.Duration(cfg().SuperviseInterval))
 	for {
-		for _, trg := range servers {
+		for _, trg := range cfg().V2flyApiAddress {
 			logWithTarget := log.WithField("target", trg)
 			res, err := u2u.ResolveV2FlyServer(trg.AsUrl())
 			if err != nil {
@@ -50,7 +50,7 @@ func Supervise() {
 }
 func ReadAllUsers() ([]u2u.UserAddType, error) {
 	var add []u2u.UserAddType
-	files, err := os.ReadDir(userDir.AsString())
+	files, err := os.ReadDir(string(cfg().UserDir))
 	if err != nil {
 		return add, err
 	}
@@ -77,8 +77,9 @@ func AddManyUsers(users *[]u2u.UserAddType, target *u2u.ServerType) (int, error)
 	defer conn.Close()
 	cnt_total := 0
 	for _, f_ := range *users {
+		i_list := cfg().InboundList
 		log_w_udata := log.WithField("email", f_.Email)
-		add_err := f_.AddMultiple(conn, &inbounds, false)
+		add_err := f_.AddMultiple(conn, &i_list, false)
 		if len(add_err) > 0 {
 			for _, e_ := range add_err {
 				log_w_udata.WithField("inbound", e_.GetInbound()).WithError(e_).Error("")
@@ -139,12 +140,13 @@ func CheckServerRestart(target *u2u.ServerType) bool {
 		return false
 	}
 	defer conn.Close()
+	i_list := cfg().InboundList
 	_u := u2u.UserAddType{
-		Uuid:  supervisUUID,
-		Email: supervisUUID + "@supervis.or",
+		Uuid:  string(cfg().SuperviseUuid),
+		Email: string(cfg().SuperviseUuid) + "@supervis.or",
 		Level: 0,
 	}
-	err_create := _u.AddMultiple(conn, &inbounds, true)
+	err_create := _u.AddMultiple(conn, &i_list, true)
 	if len(err_create) > 0 {
 		for _, err := range err_create {
 			if !err.IsUserExistsError() {
@@ -152,15 +154,12 @@ func CheckServerRestart(target *u2u.ServerType) bool {
 			}
 		}
 	}
-	return len(err_create) != len(inbounds)
+	return len(err_create) != len(cfg().InboundList)
 }
 func UserFilePath(email string) string {
-	return filepath.Join(string(userDir), email+".user")
+	return filepath.Join(string(cfg().UserDir), email+".user")
 }
 
-func init() {
-	servers = config.Config.V2flyApiAddress
-	inbounds = config.Config.InboundList
-	userDir = config.Config.UserDir
-	supervisUUID = config.Config.SuperviseUuid.AsString()
+func cfg() config.SettingsType {
+	return *config.Config()
 }

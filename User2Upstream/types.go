@@ -145,7 +145,8 @@ func (err *GrpcErrorType) Error() string {
 	return err.Err.Error()
 }
 
-func (f *InboundType) SetValue(s string) error {
+func (f *InboundType) UnmarshalText(text []byte) error {
+	s := string(text)
 	LogWithRaw := log.WithField("value", s)
 	match, _ := regexp.MatchString(".+:(VMESS|VLESS|TROJAN)", s)
 	if !match {
