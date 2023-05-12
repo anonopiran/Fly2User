@@ -34,7 +34,12 @@ func Supervise() {
 				log_w_srv := log.WithField("server", srv)
 				if CheckServerRestart(&srv) {
 					log_w_srv.Warning("found server restart. adding users")
-					AddAllUsers(&srv)
+					users, err := ReadAllUsers()
+					if err != nil {
+						log.WithError(err).Error("can not read user files")
+						continue
+					}
+					AddManyUsers(&users, &srv)
 				} else {
 					log_w_srv.Debug("no server restart found. skipping")
 				}
@@ -43,12 +48,27 @@ func Supervise() {
 		<-sleeper.C
 	}
 }
-func AddAllUsers(target *u2u.ServerType) (int, error) {
+func ReadAllUsers() ([]u2u.UserAddType, error) {
+	var add []u2u.UserAddType
 	files, err := os.ReadDir(userDir.AsString())
 	if err != nil {
-		log.WithError(err).Error("can not read user files")
-		return 0, err
+		return add, err
 	}
+	for _, f_ := range files {
+		if !strings.HasSuffix(f_.Name(), ".user") {
+			continue
+		}
+		email := f_.Name()
+		email = email[:len(email)-len(".user")]
+		f_data, err := UserFromFile(email)
+		if err != nil {
+			continue
+		}
+		add = append(add, f_data)
+	}
+	return add, nil
+}
+func AddManyUsers(users *[]u2u.UserAddType, target *u2u.ServerType) (int, error) {
 	conn, err := target.DialGrpc()
 	if err != nil {
 		log.WithError(err).Error("error while dialing grpc server")
@@ -56,18 +76,9 @@ func AddAllUsers(target *u2u.ServerType) (int, error) {
 	}
 	defer conn.Close()
 	cnt_total := 0
-	for _, f_ := range files {
-		if !strings.HasSuffix(f_.Name(), ".user") {
-			continue
-		}
-		email := f_.Name()
-		email = email[:len(email)-len(".user")]
-		log_w_udata := log.WithField("email", email)
-		f_data, err := UserFromFile(email)
-		if err != nil {
-			continue
-		}
-		add_err := f_data.AddMultiple(conn, &inbounds, false)
+	for _, f_ := range *users {
+		log_w_udata := log.WithField("email", f_.Email)
+		add_err := f_.AddMultiple(conn, &inbounds, false)
 		if len(add_err) > 0 {
 			for _, e_ := range add_err {
 				log_w_udata.WithField("inbound", e_.GetInbound()).WithError(e_).Error("")
