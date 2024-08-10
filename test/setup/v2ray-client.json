@@ -1,0 +1,122 @@
+{
+  "log": {
+    "loglevel": "info"
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": "10800",
+      "protocol": "http",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
+      "tag": "i_vmess"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": "10801",
+      "protocol": "http",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
+      "tag": "i_vless"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": "10802",
+      "protocol": "http",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
+      "tag": "i_trj"
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "v2fly-server.fly2user.local",
+            "port": 1110,
+            "users": [
+              {
+                "id": "2de15491-a498-493e-8104-4bfce4c11614",
+                "encryption": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "tag": "o_vmess"
+    },
+    {
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "v2fly-server.fly2user.local",
+            "port": 1111,
+            "users": [
+              {
+                "id": "2de15491-a498-493e-8104-4bfce4c11614",
+                "encryption": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "tag": "o_vless"
+    },
+    {
+      "protocol": "trojan",
+      "settings": {
+        "servers": [
+          {
+            "address": "v2fly-server.fly2user.local",
+            "port": 1112,
+            "password": "2de15491-a498-493e-8104-4bfce4c11614"
+          }
+        ]
+      },
+      "tag": "o_trj"
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "i_vmess"
+        ],
+        "outboundTag": "o_vmess"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "i_vless"
+        ],
+        "outboundTag": "o_vless"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "i_trj"
+        ],
+        "outboundTag": "o_trj"
+      }
+    ]
+  }
+}

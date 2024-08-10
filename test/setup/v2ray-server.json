@@ -1,0 +1,85 @@
+{
+  "log": {
+    "loglevel": "debug"
+  },
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": "1110",
+      "protocol": "vmess",
+      "settings": {
+        "clients": [],
+        "disableInsecureEncryption": false
+      },
+      "tag": "i_vmess"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": "1111",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "tag": "i_vless"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": "1112",
+      "protocol": "trojan",
+      "settings": {
+        "clients": []
+      },
+      "tag": "i_trj"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 8080,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "0.0.0.0"
+      },
+      "tag": "api"
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom"
+
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "api"
+        ],
+        "outboundTag": "api"
+      }
+    ]
+  },
+  "stats": {},
+  "api": {
+    "tag": "api",
+    "services": [
+      "HandlerService",
+      "LoggerService",
+      "StatsService"
+    ]
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "statsUserUplink": true,
+        "statsUserDownlink": true
+      }
+    },
+    "system": {
+      "statsInboundUplink": true,
+      "statsInboundDownlink": true,
+      "statsOutboundUplink": true,
+      "statsOutboundDownlink": true
+    }
+  }
+}
