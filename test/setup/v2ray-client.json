@@ -14,7 +14,7 @@
           "tls"
         ]
       },
-      "tag": "i_vmess"
+      "tag": "ii_vmess"
     },
     {
       "listen": "0.0.0.0",
@@ -27,7 +27,7 @@
           "tls"
         ]
       },
-      "tag": "i_vless"
+      "tag": "ii_vless"
     },
     {
       "listen": "0.0.0.0",
@@ -40,7 +40,16 @@
           "tls"
         ]
       },
-      "tag": "i_trj"
+      "tag": "ii_trj"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 8080,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "0.0.0.0"
+      },
+      "tag": "api"
     }
   ],
   "outbounds": [
@@ -60,7 +69,7 @@
           }
         ]
       },
-      "tag": "o_vmess"
+      "tag": "i_vmess"
     },
     {
       "protocol": "vless",
@@ -78,7 +87,7 @@
           }
         ]
       },
-      "tag": "o_vless"
+      "tag": "i_vless"
     },
     {
       "protocol": "trojan",
@@ -91,7 +100,7 @@
           }
         ]
       },
-      "tag": "o_trj"
+      "tag": "i_trj"
     }
   ],
   "routing": {
@@ -99,24 +108,37 @@
       {
         "type": "field",
         "inboundTag": [
-          "i_vmess"
+          "ii_vmess"
         ],
-        "outboundTag": "o_vmess"
+        "outboundTag": "i_vmess"
       },
       {
         "type": "field",
         "inboundTag": [
-          "i_vless"
+          "ii_vless"
         ],
-        "outboundTag": "o_vless"
+        "outboundTag": "i_vless"
       },
       {
         "type": "field",
         "inboundTag": [
-          "i_trj"
+          "ii_trj"
         ],
-        "outboundTag": "o_trj"
+        "outboundTag": "i_trj"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "api"
+        ],
+        "outboundTag": "api"
       }
+    ]
+  },
+  "api": {
+    "tag": "api",
+    "services": [
+      "HandlerService"
     ]
   }
 }

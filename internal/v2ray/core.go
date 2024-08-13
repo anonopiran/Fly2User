@@ -3,6 +3,7 @@ package v2ray
 import (
 	"context"
 	"net"
+	"strings"
 
 	"github.com/anonopiran/Fly2User/internal/config"
 	mapset "github.com/deckarep/golang-set/v2"
@@ -22,18 +23,26 @@ type UpServer struct {
 }
 
 // ...
-func (v *UpServer) Discover(ctx context.Context) (mapset.Set[string], error) {
+func (v *UpServer) Discover(ctx context.Context) mapset.Set[string] {
 	ll := v.Logger(nil)
 	ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", v.Address.Hostname())
 	if err != nil {
-		return nil, err
+		errLL := logrus.WithField("server", v.Address.Hostname()).WithError(err)
+		errMsg := "error looking up server"
+		if strings.HasSuffix(err.Error(), "no such host") {
+			errLL.Warn(errMsg)
+		} else {
+			errLL.Error(errMsg)
+		}
+		ips = []net.IP{}
+	} else {
+		ll.Debugf("found ips %+v", ips)
 	}
-	ll.Debugf("found ips %+v", ips)
 	ipSet := mapset.NewSet[string]()
 	for _, ip := range ips {
 		ipSet.Add(ip.String())
 	}
-	return ipSet, nil
+	return ipSet
 }
 func (v *UpServer) AddUser(ctx context.Context, inbound *config.InboundConfigType, user *UserType, conn *grpc.ClientConn) error {
 	if conn == nil {

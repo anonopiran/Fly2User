@@ -1,12 +1,19 @@
 {
   "log": {
-    "loglevel": "debug"
+    "loglevel": "info"
   },
   "inbounds": [
     {
       "listen": "0.0.0.0",
       "port": "1110",
       "protocol": "vmess",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
       "settings": {
         "clients": [],
         "disableInsecureEncryption": false
@@ -17,6 +24,13 @@
       "listen": "0.0.0.0",
       "port": "1111",
       "protocol": "vless",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
       "settings": {
         "clients": [],
         "decryption": "none"
@@ -27,6 +41,13 @@
       "listen": "0.0.0.0",
       "port": "1112",
       "protocol": "trojan",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
       "settings": {
         "clients": []
       },
@@ -44,8 +65,10 @@
   ],
   "outbounds": [
     {
-      "protocol": "freedom"
-
+      "protocol": "freedom",
+      "config": {
+        "domainStrategy": "UseIPv4"
+      }
     }
   ],
   "routing": {
@@ -63,23 +86,7 @@
   "api": {
     "tag": "api",
     "services": [
-      "HandlerService",
-      "LoggerService",
-      "StatsService"
+      "HandlerService"
     ]
-  },
-  "policy": {
-    "levels": {
-      "0": {
-        "statsUserUplink": true,
-        "statsUserDownlink": true
-      }
-    },
-    "system": {
-      "statsInboundUplink": true,
-      "statsInboundDownlink": true,
-      "statsOutboundUplink": true,
-      "statsOutboundDownlink": true
-    }
   }
 }

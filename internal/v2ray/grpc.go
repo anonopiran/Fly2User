@@ -34,7 +34,7 @@ func NewInsecureGrpc(address net.IP, port string) (*grpc.ClientConn, error) {
 		return nil, ErrNilPort
 	}
 	opt := grpc.WithTransportCredentials(insecure.NewCredentials())
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", address.String(), port), opt)
+	conn, err := grpc.NewClient(fmt.Sprintf("%s:%s", address.String(), port), opt)
 	if err != nil {
 		return nil, fmt.Errorf("error dial %s:%s:%s", address.String(), port, err)
 	}
