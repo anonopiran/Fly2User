@@ -4,6 +4,7 @@ import (
 	"github.com/anonopiran/Fly2User/internal/api"
 	"github.com/anonopiran/Fly2User/internal/config"
 	"github.com/anonopiran/Fly2User/internal/supervisor"
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,7 +20,8 @@ func main() {
 	if err != nil {
 		logrus.WithError(err).Fatal("error creating supervisor")
 	}
-	apiHandler := api.NewApp(&config.Config().Server, supr)
+
+	apiHandler := api.AddRoutes(gin.Default(), &config.Config().Server, supr)
 	go supr.Start()
 	apiHandler.Run(config.Config().Server.Listen)
 }

@@ -9,12 +9,12 @@ import (
 
 func addUserHandler(sup *supervisor.Supervisor) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		usr := &supervisor.UserRecord{}
+		usr := &AddUserReq{}
 		if err := c.BindJSON(usr); err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
-		if err := sup.AddUser(usr); err != nil {
+		if err := sup.AddUser(usr.AsUSer()); err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 		}
 		c.AbortWithStatusJSON(http.StatusAccepted, usr)
@@ -22,12 +22,12 @@ func addUserHandler(sup *supervisor.Supervisor) gin.HandlerFunc {
 }
 func rmUserHandler(sup *supervisor.Supervisor) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		usr := &supervisor.UserRecord{}
+		usr := &RmUserReq{}
 		if err := c.BindJSON(&usr); err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
-		if err := sup.RmUser(usr); err != nil {
+		if err := sup.RmUser(usr.AsUSer()); err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}

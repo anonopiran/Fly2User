@@ -6,8 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewApp(cfg *config.ServerConfigType, sup *supervisor.Supervisor) *gin.Engine {
-	app := gin.Default()
+func AddRoutes(app *gin.Engine, cfg *config.ServerConfigType, sup *supervisor.Supervisor) *gin.Engine {
 	api_user := app.Group("/user")
 	if (cfg.Auth != config.AuthType{}) {
 		acc := gin.Accounts{}
