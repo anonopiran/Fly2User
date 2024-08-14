@@ -36,14 +36,14 @@ func (rec *UserRecord) AsV2ray() *v2ray.UserType {
 
 func NewUserORM(dbPath string) (*gorm.DB, error) {
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		return nil, fmt.Errorf("error connecting user db: %s", err)
+	}
 	_d, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("can not get connection poll %s", err)
 	}
 	_d.SetMaxOpenConns(1)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting user db: %s", err)
-	}
 	if err := db.AutoMigrate(&UserRecord{}); err != nil {
 		return nil, fmt.Errorf("error migrating user db: %s", err)
 	}
