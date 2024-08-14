@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type UserRecord struct {
@@ -23,7 +24,7 @@ func (rec *UserRecord) logger(ll *logrus.Entry) *logrus.Entry {
 	}
 	return ll.WithField("user", fmt.Sprintf("%+v", rec))
 }
-func (rec *UserRecord) asV2ray() *v2ray.UserType {
+func (rec *UserRecord) AsV2ray() *v2ray.UserType {
 	return &v2ray.UserType{
 		Email:  rec.Email,
 		Secret: rec.UUID,
@@ -34,7 +35,7 @@ func (rec *UserRecord) asV2ray() *v2ray.UserType {
 // ...
 
 func NewUserORM(dbPath string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		return nil, fmt.Errorf("error connecting user db: %s", err)
 	}

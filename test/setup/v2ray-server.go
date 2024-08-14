@@ -90,7 +90,7 @@ func (d *DeploymentStruct) UnDeploy() {
 		}
 	}
 	d.List = []string{}
-	d.Ips.Clear()
+	d.Ips = mapset.NewSet[string]()
 	time.Sleep(1 * time.Second)
 }
 func (d *DeploymentStruct) Restart() {
@@ -101,7 +101,7 @@ func (d *DeploymentStruct) Restart() {
 	}
 	defer cli.Close()
 	noWaitTimeout := 0
-	d.Ips.Clear()
+	d.Ips = mapset.NewSet[string]()
 	wg := sync.WaitGroup{}
 	for _, cntinerID := range d.List {
 		if err := cli.ContainerRestart(ctx, cntinerID, container.StopOptions{Timeout: &noWaitTimeout}); err != nil {

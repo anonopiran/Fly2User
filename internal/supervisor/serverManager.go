@@ -8,14 +8,14 @@ import (
 	"gorm.io/gorm"
 )
 
-type downServer struct {
+type DownServerType struct {
 	// gorm.Model
 	ID        uint
 	UpSrvId   uint
 	IpAddress string `gorm:"unique"`
 }
 
-func (ds *downServer) logger(ll *logrus.Entry) *logrus.Entry {
+func (ds *DownServerType) logger(ll *logrus.Entry) *logrus.Entry {
 	if ll == nil {
 		ll = logrus.NewEntry(logrus.StandardLogger())
 	}
@@ -27,13 +27,13 @@ func newDownServerDB() (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating downserver db: %s", err)
 	}
-	if err := db.AutoMigrate(&downServer{}); err != nil {
+	if err := db.AutoMigrate(&DownServerType{}); err != nil {
 		return nil, fmt.Errorf("error migrating downserver db: %s", err)
 	}
 	return db, nil
 }
-func newDownServer(upSrvId uint, ipAddress string) *downServer {
-	return &downServer{
+func newDownServer(upSrvId uint, ipAddress string) *DownServerType {
+	return &DownServerType{
 		UpSrvId:   upSrvId,
 		IpAddress: ipAddress,
 	}

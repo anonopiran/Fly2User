@@ -17,26 +17,29 @@ import (
 )
 
 type Supervisor struct {
-	UserDB       *gorm.DB
-	DownServerDB *gorm.DB
-	UpSrvs       map[uint]*v2ray.UpServer
-	checkUser    *v2ray.UserType
-	runInterval  uint
-	inbounds     *[]config.InboundConfigType
+	UserDB         *gorm.DB
+	DownServerDB   *gorm.DB
+	DownServerLock *sync.Mutex
+	UpSrvs         map[uint]*v2ray.UpServer
+	checkUser      *v2ray.UserType
+	runInterval    uint
+	inbounds       *[]config.InboundConfigType
 }
 
 // ...down server manager
 func (sup *Supervisor) addDownServer(upId uint, ipAddr string) error {
-	downSrvDB := sup.DownServerDB
-	dbRes := downSrvDB.Create(newDownServer(upId, ipAddr))
+	sup.DownServerLock.Lock()
+	defer sup.DownServerLock.Unlock()
+	dbRes := sup.DownServerDB.Create(newDownServer(upId, ipAddr))
 	if dbRes.Error != nil {
 		return fmt.Errorf("error adding downserver to db: %s", dbRes.Error)
 	}
 	return nil
 }
 func (sup *Supervisor) rmDownServer(ipAddr string) error {
-	downSrvDB := sup.DownServerDB
-	dbRes := downSrvDB.Where("ip_address = ?", ipAddr).Delete(&downServer{})
+	sup.DownServerLock.Lock()
+	defer sup.DownServerLock.Unlock()
+	dbRes := sup.DownServerDB.Where("ip_address = ?", ipAddr).Delete(&DownServerType{})
 	if dbRes.Error != nil {
 		return fmt.Errorf("error deleting down server: %s", dbRes.Error)
 	}
@@ -60,24 +63,39 @@ func (sup *Supervisor) rmDownServerMany(ipAddrs *mapset.Set[string], logger *log
 		}
 	}
 }
+func (sup *Supervisor) getAllDownServers() ([]DownServerType, error) {
+	dnSrvs := []DownServerType{}
+	sup.DownServerLock.Lock()
+	defer sup.DownServerLock.Unlock()
+	if err := sup.DownServerDB.Find(&dnSrvs).Error; err != nil {
+		return nil, err
+	}
+	return dnSrvs, nil
+}
 func (sup *Supervisor) GetDownServerIps(upId uint) (mapset.Set[string], error) {
-	downSrvDB := sup.DownServerDB
-	downSrvList := []downServer{}
-	downSrvDB.Where("up_srv_id = ?", upId).Select("ip_address").Find(&downSrvList)
+	downSrvList := []DownServerType{}
+	err := func() error {
+		sup.DownServerLock.Lock()
+		defer sup.DownServerLock.Unlock()
+		return sup.DownServerDB.Where("up_srv_id = ?", upId).Select("ip_address").Find(&downSrvList).Error
 
+	}()
+	if err != nil {
+		return nil, fmt.Errorf("error getting down servers from db %s", err)
+	}
 	ipSet := mapset.NewSet[string]()
 	for _, dSrv := range downSrvList {
 		ipSet.Add(dSrv.IpAddress)
 	}
 	return ipSet, nil
 }
-func (sup *Supervisor) conn(downSrv *downServer) (*grpc.ClientConn, error) {
+func (sup *Supervisor) conn(downSrv *DownServerType) (*grpc.ClientConn, error) {
 	sup.logger(downSrv).Debug("dialing")
 	return v2ray.NewInsecureGrpc(net.ParseIP(downSrv.IpAddress), sup.UpSrvs[downSrv.UpSrvId].Address.Port())
 }
 
 // ... restart manager
-func (sup *Supervisor) serviceRestarted(downSrv *downServer, inbound *config.InboundConfigType, conn *grpc.ClientConn) (bool, error) {
+func (sup *Supervisor) serviceRestarted(downSrv *DownServerType, inbound *config.InboundConfigType, conn *grpc.ClientConn) (bool, error) {
 	upSrv := sup.UpSrvs[downSrv.UpSrvId]
 	ctx := context.Background()
 	err := upSrv.AddUser(ctx, inbound, sup.checkUser, conn)
@@ -92,9 +110,9 @@ func (sup *Supervisor) serviceRestarted(downSrv *downServer, inbound *config.Inb
 }
 
 // ... user manager
-func (sup *Supervisor) addUser(usr *UserRecord, downSrv *downServer, ctx context.Context, conn *grpc.ClientConn) {
+func (sup *Supervisor) addUser(usr *UserRecord, downSrv *DownServerType, ctx context.Context, conn *grpc.ClientConn) {
 	upSrv := sup.UpSrvs[downSrv.UpSrvId]
-	userTyped := usr.asV2ray()
+	userTyped := usr.AsV2ray()
 	ll := sup.logger(downSrv)
 	ll = usr.logger(ll)
 	for _, inb := range *sup.inbounds {
@@ -112,9 +130,9 @@ func (sup *Supervisor) addUser(usr *UserRecord, downSrv *downServer, ctx context
 		}
 	}
 }
-func (sup *Supervisor) rmUser(usr *UserRecord, downSrv *downServer, ctx context.Context, conn *grpc.ClientConn) {
+func (sup *Supervisor) rmUser(usr *UserRecord, downSrv *DownServerType, ctx context.Context, conn *grpc.ClientConn) {
 	upSrv := sup.UpSrvs[downSrv.UpSrvId]
-	userTyped := usr.asV2ray()
+	userTyped := usr.AsV2ray()
 	ll := sup.logger(downSrv)
 	ll = usr.logger(ll)
 	for _, inb := range *sup.inbounds {
@@ -134,7 +152,7 @@ func (sup *Supervisor) rmUser(usr *UserRecord, downSrv *downServer, ctx context.
 }
 
 // ...
-func (sup *Supervisor) logger(downSrv *downServer) *logrus.Entry {
+func (sup *Supervisor) logger(downSrv *DownServerType) *logrus.Entry {
 	return sup.UpSrvs[downSrv.UpSrvId].Logger(downSrv.logger(nil))
 }
 
@@ -153,9 +171,8 @@ func (sup *Supervisor) AddUser(usr *UserRecord) error {
 	if dbRes.Error != nil {
 		return fmt.Errorf("error adding user to db: %s", dbRes.Error)
 	}
-	dnSrvs := []downServer{}
-	dbRes = sup.DownServerDB.Find(&dnSrvs)
-	if dbRes.Error != nil {
+	dnSrvs, err := sup.getAllDownServers()
+	if err != nil {
 		return fmt.Errorf("error getting downstream from DB: %s", dbRes.Error)
 	}
 	ctx := context.Background()
@@ -163,7 +180,7 @@ func (sup *Supervisor) AddUser(usr *UserRecord) error {
 	for _, ds := range dnSrvs {
 		wg.Add(1)
 		ds := ds
-		go func(_ds *downServer) {
+		go func(_ds *DownServerType) {
 			ll := sup.logger(_ds)
 			ll = usr.logger(ll)
 			defer wg.Done()
@@ -179,13 +196,18 @@ func (sup *Supervisor) AddUser(usr *UserRecord) error {
 	return nil
 }
 func (sup *Supervisor) RmUser(usr *UserRecord) error {
+	err := func() error {
+		sup.DownServerLock.Lock()
+		defer sup.DownServerLock.Unlock()
+		return sup.UserDB.Where(usr).Delete(&UserRecord{}).Error //no error if not exist
+
+	}()
 	dbRes := sup.UserDB.Where(usr).Delete(&UserRecord{}) //no error if not exist
-	if dbRes.Error != nil {
+	if err != nil {
 		return fmt.Errorf("error removing user from db: %s", dbRes.Error)
 	}
-	dnSrvs := []downServer{}
-	dbRes = sup.DownServerDB.Find(&dnSrvs)
-	if dbRes.Error != nil {
+	dnSrvs, err := sup.getAllDownServers()
+	if err != nil {
 		return fmt.Errorf("error getting downstream from DB: %s", dbRes.Error)
 	}
 	ctx := context.Background()
@@ -193,7 +215,7 @@ func (sup *Supervisor) RmUser(usr *UserRecord) error {
 	for _, ds := range dnSrvs {
 		wg.Add(1)
 		ds := ds
-		go func(_ds *downServer) {
+		go func(_ds *DownServerType) {
 			ll := sup.logger(_ds)
 			ll = usr.logger(ll)
 			defer wg.Done()
@@ -223,9 +245,8 @@ func (sup *Supervisor) FlushUser() error {
 	if dbRes.Error != nil {
 		return fmt.Errorf("error getting users from DB: %s", dbRes.Error)
 	}
-	dnSrvs := []downServer{}
-	dbRes = sup.DownServerDB.Find(&dnSrvs)
-	if dbRes.Error != nil {
+	dnSrvs, err := sup.getAllDownServers()
+	if err != nil {
 		return fmt.Errorf("error getting downstream from DB: %s", dbRes.Error)
 	}
 	ctx := context.Background()
@@ -233,7 +254,7 @@ func (sup *Supervisor) FlushUser() error {
 	for _, ds := range dnSrvs {
 		wg.Add(1)
 		ds := ds
-		go func(_ds *downServer) {
+		go func(_ds *DownServerType) {
 			ll := sup.logger(_ds)
 			defer wg.Done()
 			conn, err := sup.conn(_ds)
@@ -263,12 +284,8 @@ func (sup *Supervisor) ServiceDiscovery() {
 		go func(_upSrv *v2ray.UpServer, _upSrvId uint) {
 			defer wg.Done()
 			ll := _upSrv.Logger(nil)
-			newDownServers, err := _upSrv.Discover(ctx)
+			newDownServers := _upSrv.Discover(ctx)
 			ll.WithField("ips", newDownServers).Debug("discovered")
-			if err != nil {
-				ll.WithError(err).Error("error discovering servers")
-				newDownServers = mapset.NewSet[string]()
-			}
 			currDownServers, err := sup.GetDownServerIps(_upSrvId)
 			ll.WithField("ips", currDownServers).Debug("current")
 			if err != nil {
@@ -284,9 +301,9 @@ func (sup *Supervisor) ServiceDiscovery() {
 	wg.Wait()
 }
 func (sup *Supervisor) RestartHandler() {
-	dnSrvs := []downServer{}
-	if dbRes := sup.DownServerDB.Find(&dnSrvs); dbRes.Error != nil {
-		logrus.WithError(dbRes.Error).Errorf("error getting downstream from DB: %s", dbRes.Error)
+	dnSrvs, err := sup.getAllDownServers()
+	if err != nil {
+		logrus.WithError(err).Errorf("error getting downstream from DB")
 		return
 	}
 	logrus.WithField("all servers", fmt.Sprintf("%+v", dnSrvs)).Debug("Restart Handler")
@@ -294,7 +311,7 @@ func (sup *Supervisor) RestartHandler() {
 	for _, ds := range dnSrvs {
 		wg.Add(1)
 		ds := ds
-		go func(_ds *downServer) {
+		go func(_ds *DownServerType) {
 			defer wg.Done()
 			ll := sup.logger(_ds)
 			conn, err := sup.conn(_ds)
@@ -348,7 +365,8 @@ func NewSupervisor(cfg config.SupervisorConfigType, upstreamCfg config.UpstreamC
 			Secret: uuid.NewString(),
 			Level:  0,
 		},
-		inbounds: &upstreamCfg.InboundList,
+		DownServerLock: &sync.Mutex{},
+		inbounds:       &upstreamCfg.InboundList,
 	}
 	return &sup, nil
 }
