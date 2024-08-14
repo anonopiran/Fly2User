@@ -281,7 +281,7 @@ var _ = Describe("Supervisor", Ordered, func() {
 		// ...
 		When("scale other service from zero", Ordered, func() {
 			BeforeAll(func() {
-				dplXray.Deploy(1)
+				dplV2fly.Deploy(1)
 			})
 			It("can discover servers", discoverSuit)
 			It("can handler restart", restartSuit)
@@ -293,6 +293,7 @@ var _ = Describe("Supervisor", Ordered, func() {
 		When("scale all service up", Ordered, func() {
 			BeforeAll(func() {
 				dplXray.Deploy(1)
+				dplV2fly.Deploy(1)
 			})
 			It("can discover servers", discoverSuit)
 			It("can handler restart", restartSuit)

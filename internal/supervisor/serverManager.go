@@ -27,6 +27,11 @@ func newDownServerDB() (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating downserver db: %s", err)
 	}
+	_d, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("can not get connection poll %s", err)
+	}
+	_d.SetMaxOpenConns(1)
 	if err := db.AutoMigrate(&DownServerType{}); err != nil {
 		return nil, fmt.Errorf("error migrating downserver db: %s", err)
 	}
